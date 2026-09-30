@@ -24,6 +24,13 @@ export interface StoryClue {
   payoffSceneId: string;
 }
 
+export interface StoryGoals {
+  requiredClueIds: string[];
+  requiredCharacterIds: string[];
+  sceneCountMin: number | null;
+  sceneCountMax: number | null;
+}
+
 export interface StoryDocument {
   version: 1;
   id: string;
@@ -32,8 +39,13 @@ export interface StoryDocument {
   characters: StoryCharacter[];
   scenes: StoryScene[];
   clues: StoryClue[];
+  goals: StoryGoals;
   selectedSceneId: string;
   updatedAt: string;
+}
+
+export function createEmptyGoals(): StoryGoals {
+  return { requiredClueIds: [], requiredCharacterIds: [], sceneCountMin: null, sceneCountMax: null };
 }
 
 export interface StoryStats {
@@ -91,6 +103,7 @@ export function createStarterStory(): StoryDocument {
         payoffSceneId: '',
       },
     ],
+    goals: createEmptyGoals(),
     selectedSceneId: oldHarborId,
     updatedAt: new Date().toISOString(),
   };

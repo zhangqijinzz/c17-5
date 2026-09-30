@@ -5,9 +5,11 @@ import {
   type StoryCharacter,
   type StoryClue,
   type StoryDocument,
+  type StoryGoals,
   type StoryScene,
 } from '../models/story';
 import { getStats, getTimelineWarning, orderedScenes, validateName } from '../models/storyRules';
+import { evaluateGoals, type GoalReport } from '../models/storyGoals';
 import type { StoryRepository } from '../repositories/storyRepository';
 
 export type ViewModelStatus = 'loading' | 'ready' | 'editing' | 'error' | 'completed';
@@ -154,7 +156,15 @@ export class StoryViewModel {
 
   completeProject(): void {
     this.updateStory((story) => ({ ...story, status: 'complete' }));
-    this.setState({ status: 'completed', notice: '项目已标记为完成，仍可继续编辑' });
+    const report = this.state.story ? evaluateGoals(this.state.story) : null;
+    const openCount = report ? report.total - report.metCount : 0;
+    this.setState({
+      status: 'completed',
+      notice:
+        openCount > 0
+          ? `项目已标记为完成，仍有 ${openCount} 项结构目标未达成，可在下方核对清单查看`
+          : '项目已标记为完成，仍可继续编辑',
+    });
   }
 
   resetProject(): void {
@@ -183,6 +193,65 @@ export class StoryViewModel {
   get timelineWarning(): string | null {
     const story = this.state.story;
     return story ? getTimelineWarning(story) : null;
+  }
+
+  get goalReport(): GoalReport | null {
+    const story = this.state.story;
+    return story ? evaluateGoals(story) : null;
+  }
+
+  get sceneGoalHints(): Record<string, string[]> {
+    return this.goalReport?.sceneHints ?? {};
+  }
+
+  toggleRequiredClue(clueId: string): void {
+    this.updateGoals((goals) => ({
+      ...goals,
+      requiredClueIds: this.toggleId(goals.requiredClueIds, clueId),
+    }));
+  }
+
+  toggleRequiredCharacter(characterId: string): void {
+    this.updateGoals((goals) => ({
+      ...goals,
+      requiredCharacterIds: this.toggleId(goals.requiredCharacterIds, characterId),
+    }));
+  }
+
+  setGoalSceneCount(minInput: string, maxInput: string): void {
+    const parseBound = (value: string): number | null | undefined => {
+      const trimmed = value.trim();
+      if (!trimmed) return null;
+      const parsed = Number(trimmed);
+      if (!Number.isInteger(parsed) || parsed < 0) {
+        this.setState({ notice: '场景数量请填写不小于 0 的整数' });
+        return undefined;
+      }
+      return parsed;
+    };
+    const min = parseBound(minInput);
+    if (min === undefined) return;
+    const max = parseBound(maxInput);
+    if (max === undefined) return;
+    if (min !== null && max !== null && min > max) {
+      this.setState({ notice: '场景下限不能大于上限' });
+      return;
+    }
+    this.updateGoals((goals) => ({ ...goals, sceneCountMin: min, sceneCountMax: max }));
+    this.setState({ notice: '结构目标已更新，核对结果已按新目标重算' });
+  }
+
+  clearGoals(): void {
+    this.updateGoals(() => ({ requiredClueIds: [], requiredCharacterIds: [], sceneCountMin: null, sceneCountMax: null }));
+    this.setState({ notice: '结构目标已清空' });
+  }
+
+  private toggleId(ids: string[], id: string): string[] {
+    return ids.includes(id) ? ids.filter((entry) => entry !== id) : [...ids, id];
+  }
+
+  private updateGoals(updater: (goals: StoryGoals) => StoryGoals): void {
+    this.updateStory((story) => ({ ...story, goals: updater(story.goals) }));
   }
 
   private requireStory(): StoryDocument {

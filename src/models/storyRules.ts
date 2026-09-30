@@ -1,4 +1,5 @@
 import type { StoryDocument, StoryScene, StoryStats } from './story';
+import { sanitizeGoals } from './storyGoals';
 
 export function orderedScenes(story: StoryDocument): StoryScene[] {
   return [...story.scenes].sort((a, b) => a.order - b.order);
@@ -41,5 +42,6 @@ export function sanitizeStory(input: unknown): StoryDocument | null {
   ) {
     return null;
   }
-  return candidate as StoryDocument;
+  // 已有项目默认没有目标：旧存档缺少 goals 字段时补空目标，打开后照常编辑。
+  return { ...(candidate as StoryDocument), goals: sanitizeGoals(candidate.goals) };
 }

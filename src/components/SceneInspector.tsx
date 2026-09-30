@@ -10,6 +10,11 @@ export function SceneInspector({ viewModel, scene, characters }: SceneInspectorP
   return (
     <section className="panel inspector">
       <div className="inspector-top"><div><span className="eyebrow">SCENE {String(index + 1).padStart(2, '0')} / 场景详情</span><h2>{scene.title}</h2></div><span className="edit-state">编辑中</span></div>
+      {(viewModel.sceneGoalHints[scene.id] ?? []).length > 0 && (
+        <div className="scene-goal-hints">
+          {(viewModel.sceneGoalHints[scene.id] ?? []).map((hint) => <span key={hint}>◎ {hint}</span>)}
+        </div>
+      )}
       <label>场景标题<input value={scene.title} onChange={(event) => viewModel.updateScene(scene.id, { title: event.target.value })} /></label>
       <label>这一幕发生了什么<textarea value={scene.summary} onChange={(event) => viewModel.updateScene(scene.id, { summary: event.target.value })} rows={3} /></label>
       <label>核心冲突<textarea value={scene.conflict} onChange={(event) => viewModel.updateScene(scene.id, { conflict: event.target.value })} rows={2} placeholder="是什么让人物无法轻易得到想要的东西？" /></label>

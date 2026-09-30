@@ -24,6 +24,13 @@ export interface StoryClue {
   payoffSceneId: string;
 }
 
+export interface StoryGoals {
+  sceneCountMin: number | null;
+  sceneCountMax: number | null;
+  requiredCharacterIds: string[];
+  requiredClueIds: string[];
+}
+
 export interface StoryDocument {
   version: 1;
   id: string;
@@ -32,6 +39,7 @@ export interface StoryDocument {
   characters: StoryCharacter[];
   scenes: StoryScene[];
   clues: StoryClue[];
+  goals?: StoryGoals;
   selectedSceneId: string;
   updatedAt: string;
 }
@@ -48,6 +56,10 @@ export const characterColors = ['coral', 'blue', 'gold', 'sage', 'violet'] as co
 
 export function createId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+export function createEmptyGoals(): StoryGoals {
+  return { sceneCountMin: null, sceneCountMax: null, requiredCharacterIds: [], requiredClueIds: [] };
 }
 
 export function createStarterStory(): StoryDocument {

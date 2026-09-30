@@ -1,13 +1,15 @@
 import {
   characterColors,
+  createEmptyGoals,
   createId,
   createStarterStory,
   type StoryCharacter,
   type StoryClue,
   type StoryDocument,
+  type StoryGoals,
   type StoryScene,
 } from '../models/story';
-import { getStats, getTimelineWarning, orderedScenes, validateName } from '../models/storyRules';
+import { checkStoryGoals, getStats, getTimelineWarning, orderedScenes, validateName, type GoalCheckItem, type GoalReport } from '../models/storyRules';
 import type { StoryRepository } from '../repositories/storyRepository';
 
 export type ViewModelStatus = 'loading' | 'ready' | 'editing' | 'error' | 'completed';
@@ -154,7 +156,48 @@ export class StoryViewModel {
 
   completeProject(): void {
     this.updateStory((story) => ({ ...story, status: 'complete' }));
-    this.setState({ status: 'completed', notice: '项目已标记为完成，仍可继续编辑' });
+    const unmet = this.goalReport?.unmet.length ?? 0;
+    const notice = unmet > 0 ? `项目已标记为完成，仍有 ${unmet} 项结构目标未达成` : '项目已标记为完成，仍可继续编辑';
+    this.setState({ status: 'completed', notice });
+  }
+
+  enableGoals(): void {
+    this.updateStory((story) => (story.goals ? story : { ...story, goals: createEmptyGoals() }));
+    this.setState({ notice: '已开启结构目标，之后每次编辑都会按目标核对' });
+  }
+
+  clearGoals(): void {
+    this.updateStory((story) => {
+      const next = { ...story };
+      delete next.goals;
+      return next;
+    });
+    this.setState({ notice: '已清除全部结构目标' });
+  }
+
+  setSceneCountGoal(min: number | null, max: number | null): void {
+    let low = min === null ? null : Math.max(0, Math.round(min));
+    let high = max === null ? null : Math.max(0, Math.round(max));
+    if (low !== null && high !== null && low > high) [low, high] = [high, low];
+    this.updateGoals((goals) => ({ ...goals, sceneCountMin: low, sceneCountMax: high }), false);
+  }
+
+  toggleGoalCharacter(characterId: string): void {
+    this.updateGoals((goals) => ({
+      ...goals,
+      requiredCharacterIds: goals.requiredCharacterIds.includes(characterId)
+        ? goals.requiredCharacterIds.filter((id) => id !== characterId)
+        : [...goals.requiredCharacterIds, characterId],
+    }), false);
+  }
+
+  toggleGoalClue(clueId: string): void {
+    this.updateGoals((goals) => ({
+      ...goals,
+      requiredClueIds: goals.requiredClueIds.includes(clueId)
+        ? goals.requiredClueIds.filter((id) => id !== clueId)
+        : [...goals.requiredClueIds, clueId],
+    }), false);
   }
 
   resetProject(): void {
@@ -185,6 +228,17 @@ export class StoryViewModel {
     return story ? getTimelineWarning(story) : null;
   }
 
+  get goalReport(): GoalReport | null {
+    const story = this.state.story;
+    return story ? checkStoryGoals(story) : null;
+  }
+
+  goalHintsForScene(sceneId: string): GoalCheckItem[] {
+    const report = this.goalReport;
+    if (!report) return [];
+    return report.unmet.filter((item) => item.sceneIds.includes(sceneId));
+  }
+
   private requireStory(): StoryDocument {
     if (!this.state.story) throw new Error('故事尚未初始化');
     return this.state.story;
@@ -194,6 +248,10 @@ export class StoryViewModel {
     const story = updater(this.requireStory());
     this.persist(story);
     this.setState({ story, stats: getStats(story), status: showEditing ? 'editing' : this.state.status, error: '' });
+  }
+
+  private updateGoals(updater: (goals: StoryGoals) => StoryGoals, showEditing = true): void {
+    this.updateStory((story) => ({ ...story, goals: updater(story.goals ?? createEmptyGoals()) }), showEditing);
   }
 
   private persist(story: StoryDocument): void {
